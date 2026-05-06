@@ -1,18 +1,28 @@
 # Setup
+
+## Database Setup 
+
+cd CustomerOrdersApp\
+
 docker compose up -d
 
 dotnet ef database update `
   --project src\CustomerOrdersApp.Infrastructure `
   --startup-project src\CustomerOrdersApp.Api
 
-cd C:\Code\CustomerOrdersApp\src\CustomerOrdersApp.Api
+## Run API
+
+cd CustomerOrdersApp\src\CustomerOrdersApp.Api
 dotnet run
 
-cd C:\Code\CustomerOrdersApp\frontend\CustomerOrdersApp.Web
+## Run Frontend
+
+cd CustomerOrdersApp\frontend\CustomerOrdersApp.Web
 npm run dev
 
-Navigate to Upload Files. Upload each file.
+## Usage
 
+Navigate to the Upload Files page and upload each CSV file.
 
 # Decisions
 
@@ -23,7 +33,6 @@ Navigate to Upload Files. Upload each file.
 - CSV ingestion pipeline
 - Domain-event driven discount processing
 
----
 ## Setup domain entities. 
 
 All inherit Base entity, giving Id and PublicId. PublicId is an int to match the source data. PublicId remains an int to align with the source data identifiers. In a production system I would likely separate external identifiers from internal GUID-based identities.
@@ -43,14 +52,11 @@ OrderItem:
 - "Item_Id" processed but did nothing with. My assumption is there would also be an Items table/entity in the wider domain model, however the supplied dataset did not require implementing it. 
 - Added FinalPrice to OrderItem so I could process Discounts. I chose to not handle in memory so that calculating totals is easier as each item can have a different discount. This will later simplify Invoicing. 
 
----
-
 ## Layout
 Without additional guidance I use clean architecture for the project layout. To developers unfamiliar with this layout the one day scope could be at risk. I work day to day with this layout so did not see any disadvantages. It would be beneficial to match the staff tech stack if growth of the system is expected. An existing system is mentioned in the spec, if migration or merging was required this should be reviewed before starting work. I made the assumption this would act like a microservice and thus have no coupling or requirements to the other system.
 
 As a general rule I prefer persistence boundaries to exist outside repositories rather than calling `SaveChanges` directly within them. In larger systems I would typically expose a narrower commit abstraction to avoid application code depending directly on the DbContext and to better control transactional consistency across repositories.
 
----
 
 ## CSVs
 
@@ -69,10 +75,7 @@ I created an object to parse the files into before validating. In a real world s
 - Future concerns for mapping State, if users send files with full state name rather than code.
 - Mapping is currently within each cmd. Should ideally move elsewhere, should it be used again.
 
----
-
 ## Discount
-
 
 With discount I took onboard the idea to not keep it tightly coupled and created a DiscountService. This handles all the logic and domain event. The command is only exposed to whether or not the customer has discount, discount amount and the reason so that we could return these for FE if wanted.
 
@@ -95,14 +98,10 @@ Without the concept of knowing how the event is used I chose to raise an event p
 ### Assumptions
 I only currently apply discount to unshipped orders. My assumption is once an order is shipped it may be paid for. I still generated a version that applies regardless that can easily be swapped if necessary by changing `src\CustomerOrdersApp.Application\Discounts\DiscountService.cs` line 50 from `await _discountRepo.ApplyDiscountToUnshippedOrders(customer, bestDiscount.Amount, ct);` to `await _discountRepo.ApplyDiscountToAllOrders(customer, bestDiscount.Amount, ct);`.
 
----
-
 ## Tests
 I created unit tests. My general concept is tests first then write code to complete them. I prioritised validating the higher-risk business logic with unit tests rather than pursuing broader test coverage. You will see these tests in `tests\CustomerOrdersApp.UnitTests`
 
 I did not create any Integration tests as I did not do any complex data arrangement that I felt required it within the timeframe. For production these tests should exist. 
-
----
 
 ## Frontend
 Front end is intentionally lightweight and accelerated with AI assistance to show a proof of concept so I could focus the available time on backend architecture and domain concerns. It uses Vue.js with all code existing in `frontend\CustomerOrdersApp.Web\src\App.vue`.
@@ -128,5 +127,3 @@ Discounts:
 - I would have a service .ts for each controller.
 - I would move the types into separate .ts for each api
 - Separate out the main.css
-
----
