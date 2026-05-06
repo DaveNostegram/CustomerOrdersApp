@@ -1,4 +1,4 @@
-setup:
+# Setup
 docker compose up -d
 
 dotnet ef database update `
@@ -16,47 +16,117 @@ Navigate to Upload Files. Upload each file.
 
 # Decisions
 
-Without additional guidance I use clean architecture for the project layout. To developers unfamiliar with this layout the one day scope could be at risk. I work day to day with this layout so did not see any disadvantages. Had I had access to the existing system I would have used this in my consideration, should migrations or merging be required. 
+- Clean Architecture structure
+- CQRS with MediatR
+- EF Core + SQL Server
+- Vue frontend
+- CSV ingestion pipeline
+- Domain-event driven discount processing
 
+---
 ## Setup domain entities. 
 
-All inherit Base entity, giving Id and PublicId. PublicId is a int to match the excel documents. Ideally this would be a Guid.
+All inherit Base entity, giving Id and PublicId. PublicId is an int to match the source data. PublicId remains an int to align with the source data identifiers. In a production system I would likely separate external identifiers from internal GUID-based identities.
 
-State should be an enum minimum due to using in the discount as having as a string has risk with future input, plus state is a limited so not necessary to be a separate table. 
+Customer:
+- State data set is small, stable, and finite. As such I parsed as enum, as string would risk discount functionality.
+- Phone is optional
+- Email should be validated as an email
 
-Order had order status which I set as Enum as won't have any meaningful growth. Customer Id is a foreign key
+Order:
+- Status data set is small, stable, and finite. As such I parsed as enum and by setting to an enum we enable better FE experience. 
+- Customer Id is a foreign key
+- Shipped date is optional, and appears to correlate to order_status 4. As such my assumption is that 4 is "Shipped"
 
-Order item has no publicId, as such I generated one. "Item_Id" I processed but did nothing with. My assumption is there would be a Items table that I would process, but with time contrains I did not create this entity. Added FinalPrice to OrderItem so I could process Discounts. For costing you would not want to calculate this in memory.
+OrderItem: 
+- No publicId so I generated one. 
+- "Item_Id" processed but did nothing with. My assumption is there would also be an Items table/entity in the wider domain model, however the supplied dataset did not require implementing it. 
+- Added FinalPrice to OrderItem so I could process Discounts. I chose to not handle in memory so that calculating totals is easier as each item can have a different discount. This will later simplify Invoicing. 
 
-## Backend
+---
 
-As general rule I only save changes outside of repos rather than as part of the repo. Currently it's a separate call. In future move to unit of work for saving changes from Repo, as data gets more complex as we save across multiple repos it'll become an issue.
+## Layout
+Without additional guidance I use clean architecture for the project layout. To developers unfamiliar with this layout the one day scope could be at risk. I work day to day with this layout so did not see any disadvantages. It would be beneficial to match the staff tech stack if growth of the system is expected. An existing system is mentioned in the spec, if migration or merging was required this should be reviewed before starting work. I made the assumption this would act like a microservice and thus have no coupling or requirements to the other system.
 
+As a general rule I prefer persistence boundaries to exist outside repositories rather than calling `SaveChanges` directly within them. In larger systems I would typically expose a narrower commit abstraction to avoid application code depending directly on the DbContext and to better control transactional consistency across repositories.
+
+---
 
 ## CSVs
 
 ### Decisions
 
 I made an assumption on Order Status, based on shipped date, and named the Enum accordingly.
-I only process CSV, handling Excel would not fit within the timeframe
-I created a object to parse the files into before validating. In a real world scenario and larger files you'd likely put these into a table and handle them elsewhere so the user is not waiting for completion, then send a message once done.
+I only process CSV files.
+I created an object to parse the files into before validating. In a real world scenario and larger files you'd likely put these into a table and handle them elsewhere so the user is not waiting for completion, then send a message once done.
 
 ### Future refactor
-ImportCustomersResult errors ideally should carry more than just string. Within the timeframe I simplified this.
-Added that Validate Headers also checks for duplicates but isn't clear from method name. Should refactor ideally
-Each uploader has repeatative code, this code be refactored but for timeframe was copy pasted.
-I do not currently validate correctly for already exists in the system due to time contrains. This would need to exist in future.
-Headers of files are currently hard coded. It's worthwhile having validation checking for alternatives i.e. "first_name" could also accept "firstname" or "first name"
-Future concerns for mapping State, if users send files with full state name rather than code.
-Mapping is currently within each cmd. Should ideally move elsewhere, should it be used again.
+- ImportCustomersResult errors ideally should carry more than just string.
+- Validate Headers checks for duplicates but isn't clear from method name. The method name should better reflect this behaviour.
+- Each uploader currently contains repetitive logic that could be extracted into shared import infrastructure.
+- Duplicate detection against existing persisted records should be added.
+- Headers of files are currently hard coded. It's worthwhile having validation checking for alternatives i.e. "first_name" could also accept "firstname" or "first name"
+- Future concerns for mapping State, if users send files with full state name rather than code.
+- Mapping is currently within each cmd. Should ideally move elsewhere, should it be used again.
 
-
-
+---
 
 ## Discount
 
-With discount I took onboard the 
 
-Currently the discount repo is hard coded, it can be wired to add more later.
+With discount I took onboard the idea to not keep it tightly coupled and created a DiscountService. This handles all the logic and domain event. The command is only exposed to whether or not the customer has discount, discount amount and the reason so that we could return these for FE if wanted.
 
-It allows flexibility of new discounts. It handles the possibility of multiple discounts and picks the highest.
+The discount pipeline was designed to support additional discount rules by evaluating all applicable discounts and selecting the largest valid discount for the customer. It currently *does not* check against the existing discount to confirm whether that's bigger or not. It needs to do this in future or we risk increasing prices and unhappy customers.
+
+Discount also has a Type so in future another method of discount could be used e.g. Customer loyalty. You'll see ExampleFutureDiscount in a switch to preview this.
+
+`src\CustomerOrdersApp.Infrastructure\Repositories\DiscountRepo.cs` Discount definitions are currently in-memory rather than persisted. If you want to test it you would only need to change the values here.
+
+### Event 
+I chose to use a MediatR notification for this as I already used MediatR so it felt like an easy transition. The current event handler logs to the console for demonstration purposes which you should see in your API window on apply discounts. Ideally this would actually post to an Audit table or similar. 
+
+Without the concept of knowing how the event is used I chose to raise an event per customer. This could be used in different ways:
+- Audit to validate discounts
+- Send emails/notifications to customers as they would be pleased to hear they get a discount.
+- Report on how often discounts are given.
+- Trigger invoice, or correct invoice. 
+- Confirm customer remains valid for the discount.
+
+### Assumptions
+I only currently apply discount to unshipped orders. My assumption is once an order is shipped it may be paid for. I still generated a version that applies regardless that can easily be swapped if necessary by changing `src\CustomerOrdersApp.Application\Discounts\DiscountService.cs` line 50 from `await _discountRepo.ApplyDiscountToUnshippedOrders(customer, bestDiscount.Amount, ct);` to `await _discountRepo.ApplyDiscountToAllOrders(customer, bestDiscount.Amount, ct);`.
+
+---
+
+## Tests
+I created unit tests. My general concept is tests first then write code to complete them. I prioritised validating the higher-risk business logic with unit tests rather than pursuing broader test coverage. You will see these tests in `tests\CustomerOrdersApp.UnitTests`
+
+I did not create any Integration tests as I did not do any complex data arrangement that I felt required it within the timeframe. For production these tests should exist. 
+
+---
+
+## Frontend
+Front end is intentionally lightweight and accelerated with AI assistance to show a proof of concept so I could focus the available time on backend architecture and domain concerns. It uses Vue.js with all code existing in `frontend\CustomerOrdersApp.Web\src\App.vue`.
+
+For user experience, customers auto reload when uploading, clearing all data, or applying discounts.
+
+### Additional Improvements
+Customers:
+- Styled the tables better
+- Removed the expand button when no orders
+- Add paging (with a new GetPaged)
+- Add filters.
+
+Upload Files: 
+- Clear data per upload
+- Log of the last uploads. 
+
+Discounts: 
+- Ability to add additional discounts in an admin managed area.
+
+### Future refactor
+- Customers tab/Upload Files tab would move to separate components
+- I would have a service .ts for each controller.
+- I would move the types into separate .ts for each api
+- Separate out the main.css
+
+---
