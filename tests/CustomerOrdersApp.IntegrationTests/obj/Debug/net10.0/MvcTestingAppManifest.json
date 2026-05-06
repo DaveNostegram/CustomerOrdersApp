@@ -1,7 +1,0 @@
-{
-  "CustomerOrdersApp.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\CustomerOrdersApp\\src\\CustomerOrdersApp.Api",
-  "CustomerOrdersApp.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\CustomerOrdersApp\\src\\CustomerOrdersApp.Application",
-  "CustomerOrdersApp.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\CustomerOrdersApp\\src\\CustomerOrdersApp.Contracts",
-  "CustomerOrdersApp.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\CustomerOrdersApp\\src\\CustomerOrdersApp.Domain",
-  "CustomerOrdersApp.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\CustomerOrdersApp\\src\\CustomerOrdersApp.Infrastructure"
-}

@@ -7,7 +7,6 @@
     <Project Path="src/CustomerOrdersApp.Infrastructure/CustomerOrdersApp.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/CustomerOrdersApp.IntegrationTests/CustomerOrdersApp.IntegrationTests.csproj" />
     <Project Path="tests/CustomerOrdersApp.UnitTests/CustomerOrdersApp.UnitTests.csproj" />
   </Folder>
 </Solution>
