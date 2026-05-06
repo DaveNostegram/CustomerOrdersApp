@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CustomerOrdersApp.Api/CustomerOrdersApp.Api.csproj" />
+    <Project Path="src/CustomerOrdersApp.Application/CustomerOrdersApp.Application.csproj" />
+    <Project Path="src/CustomerOrdersApp.Contracts/CustomerOrdersApp.Contracts.csproj" />
+    <Project Path="src/CustomerOrdersApp.Domain/CustomerOrdersApp.Domain.csproj" />
+    <Project Path="src/CustomerOrdersApp.Infrastructure/CustomerOrdersApp.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CustomerOrdersApp.IntegrationTests/CustomerOrdersApp.IntegrationTests.csproj" />
+    <Project Path="tests/CustomerOrdersApp.UnitTests/CustomerOrdersApp.UnitTests.csproj" />
+  </Folder>
+</Solution>
